@@ -1,2 +1,3 @@
-# web-based-services-in-rust-workshop
-Repository with workshop materials
+# Workshop Materials for "Web Based Services in Rust"
+
+tbd.
