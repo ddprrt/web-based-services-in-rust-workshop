@@ -1,0 +1,24 @@
+[package]
+name = "microservice-rust-workshop"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+axum = "0.6.0-rc.1"
+tokio = { version = "1.21.2", features = ["full"] }
+tower = { version = "0.4", features = ["util"] }
+tower-http = { version = "0.3.4", features = [
+    "add-extension",
+    "auth",
+    "compression-full",
+    "limit",
+    "trace",
+] }
+tracing = "0.1.37"
+tracing-subscriber = { version = "0.3.16", features = ["env-filter"] }
+hyper = { version = "0.14", features = ["full"] }
+gag = "1.0.0"
+futures = "0.3.25"
+axum-macros = "0.3.4"
