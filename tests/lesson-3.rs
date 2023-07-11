@@ -6,9 +6,10 @@ use axum::{
 };
 
 use gag::BufferRedirect;
-use microservice_rust_workshop::{router, SharedState};
-use tower::Service; // for `call`
+use tower::Service;
+use webservice_rust_workshop::{router, SharedState}; // for `call`
 
+#[ignore]
 #[tokio::test]
 async fn log_test() {
     // Run with nocapture

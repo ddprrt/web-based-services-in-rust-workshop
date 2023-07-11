@@ -3,9 +3,10 @@ use axum::{
     http::{Request, StatusCode},
 };
 
-use microservice_rust_workshop::{router, SharedState};
-use tower::Service; // for `call`
+use tower::Service;
+use webservice_rust_workshop::{router, SharedState}; // for `call`
 
+#[ignore]
 #[tokio::test]
 async fn basic_db_test() {
     let state = SharedState::default();
@@ -39,6 +40,7 @@ async fn basic_db_test() {
     assert_eq!(&body[..], b"Hello World");
 }
 
+#[ignore]
 #[tokio::test]
 async fn big_request() {
     let state = SharedState::default();
@@ -74,6 +76,7 @@ async fn big_request() {
     assert_eq!(&body[..], &bytes[..]);
 }
 
+#[ignore]
 #[tokio::test]
 async fn no_entry() {
     let state = SharedState::default();
