@@ -1,5 +1,5 @@
 [package]
-name = "webservice-rust-workshop"
+name = "webservice_rust_workshop"
 version = "0.1.0"
 edition = "2021"
 
@@ -22,3 +22,4 @@ hyper = { version = "0.14", features = ["full"] }
 gag = "1.0.0"
 futures = "0.3.25"
 axum-macros = "0.3.4"
+serde = { version = "1.0", features = ["derive"] }
