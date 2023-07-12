@@ -3,7 +3,13 @@ use std::{
     sync::{Arc, RwLock},
 };
 
-use axum::{body::Bytes, extract::Query, response::Html, routing::get, Router};
+use axum::{
+    body::Bytes,
+    extract::{Query, State},
+    response::Html,
+    routing::get,
+    Router,
+};
 
 use serde::Deserialize;
 
