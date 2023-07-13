@@ -1,20 +1,22 @@
 use std::{
     collections::HashMap,
     sync::{Arc, PoisonError, RwLock},
+    time::Duration,
 };
 
 use axum::{
     body::Bytes,
+    error_handling::HandleErrorLayer,
     extract::{DefaultBodyLimit, Path, Query, State},
     handler::Handler,
     response::{Html, IntoResponse},
     routing::get,
-    Router,
+    BoxError, Router,
 };
 
 use hyper::{Body, Request, StatusCode};
 use serde::Deserialize;
-use tower::{Layer, Service, ServiceBuilder};
+use tower::{timeout::TimeoutLayer, Layer, Service, ServiceBuilder};
 
 /// Custom type for a shared state
 pub type SharedState = Arc<RwLock<AppState>>;
@@ -35,7 +37,23 @@ pub fn router(state: &SharedState) -> Router<SharedState> {
                     .service(handler_kv_post.with_state(Arc::clone(state))),
             ),
         )
+        .layer(
+            ServiceBuilder::new()
+                .layer(HandleErrorLayer::new(handle_error))
+                .layer(TimeoutLayer::new(Duration::from_secs(5))),
+        )
         .layer(LoggerMiddleware::new())
+}
+
+async fn handle_error(err: BoxError) -> (StatusCode, &'static str) {
+    if err.is::<tower::timeout::error::Elapsed>() {
+        eprintln!("Request timed out: {}", err);
+        return (StatusCode::REQUEST_TIMEOUT, "Request timed out");
+    } else if err.is::<std::io::Error>() {
+        eprintln!("IO Error: {}", err);
+        return (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error");
+    }
+    (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error")
 }
 
 #[derive(Deserialize)]
@@ -51,6 +69,7 @@ async fn handler_hello(Query(visitor_params): Query<VisitorParams>) -> Html<Stri
 }
 
 async fn hello_axum() -> &'static str {
+    tokio::time::sleep(Duration::from_secs(6)).await;
     "<h1>Hello Axum</h1>"
 }
 
