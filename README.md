@@ -80,5 +80,9 @@ Those are the four exercises.
 Run tests with `--nocapture`!
 
 ### Exercise 4: *Built-in Services*
+
+DELETE /admin/kv --> deleting all entries
+DELETE /admin/kv/:key --> deleting a specific entry
+
 - Define nested routes for administrative tasks, be sure to add authorization so only authorized people can access. A plain auth token is ok, if you want to go fancy create your own implementation.
 - Stretch goal: If you haven't worked on the upload limit, try doing it now.

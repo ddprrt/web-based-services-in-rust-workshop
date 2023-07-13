@@ -10,13 +10,14 @@ use axum::{
     extract::{DefaultBodyLimit, Path, Query, State},
     handler::Handler,
     response::{Html, IntoResponse},
-    routing::get,
+    routing::{delete, get},
     BoxError, Router,
 };
 
 use hyper::{Body, Request, StatusCode};
 use serde::Deserialize;
 use tower::{timeout::TimeoutLayer, Layer, Service, ServiceBuilder};
+use tower_http::auth::RequireAuthorizationLayer;
 
 /// Custom type for a shared state
 pub type SharedState = Arc<RwLock<AppState>>;
@@ -37,12 +38,45 @@ pub fn router(state: &SharedState) -> Router<SharedState> {
                     .service(handler_kv_post.with_state(Arc::clone(state))),
             ),
         )
+        .nest("/admin", admin_routes(state))
         .layer(
             ServiceBuilder::new()
                 .layer(HandleErrorLayer::new(handle_error))
                 .layer(TimeoutLayer::new(Duration::from_secs(5))),
         )
         .layer(LoggerMiddleware::new())
+}
+
+fn admin_routes(state: &SharedState) -> Router<SharedState> {
+    Router::with_state(Arc::clone(state))
+        .route("/kv", delete(admin_handle_delete))
+        .route("/kv/:key", delete(admin_handle_delete_key))
+        .layer(RequireAuthorizationLayer::bearer("secret"))
+}
+
+async fn admin_handle_delete_key(
+    Path(key): Path<String>,
+    State(state): State<SharedState>,
+) -> (StatusCode, &'static str) {
+    let mut state = match state.write() {
+        Ok(state) => state,
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, "Database corrupted"),
+    };
+
+    let _ = state.db.remove(&key);
+
+    (StatusCode::OK, "Deleted entry")
+}
+
+async fn admin_handle_delete(State(state): State<SharedState>) -> (StatusCode, &'static str) {
+    let mut state = match state.write() {
+        Ok(state) => state,
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, "Database corrupted"),
+    };
+
+    state.db.clear();
+
+    (StatusCode::OK, "Deleted all entries")
 }
 
 async fn handle_error(err: BoxError) -> (StatusCode, &'static str) {
@@ -69,7 +103,7 @@ async fn handler_hello(Query(visitor_params): Query<VisitorParams>) -> Html<Stri
 }
 
 async fn hello_axum() -> &'static str {
-    tokio::time::sleep(Duration::from_secs(6)).await;
+    //tokio::time::sleep(Duration::from_secs(6)).await;
     "<h1>Hello Axum</h1>"
 }
 
@@ -80,7 +114,7 @@ async fn handler_kv_post(
 ) -> Result<&'static str, (StatusCode, &'static str)> {
     let mut state = match state.write() {
         Ok(state) => state,
-        Err(err) => return Err((StatusCode::INTERNAL_SERVER_ERROR, "Database corrupted")),
+        Err(_) => return Err((StatusCode::INTERNAL_SERVER_ERROR, "Database corrupted")),
     };
 
     state.db.insert(key, bytes);
@@ -119,10 +153,10 @@ impl Point<i32, i32> {
     }
 }
 
-fn foo() {
+fn _foo() {
     let int_point = Point::new(1, 2);
     int_point.sum();
-    let str_point = Point::new("a", "b");
+    let _str_point = Point::new("a", "b");
 }
 
 async fn handler_kv_get(
