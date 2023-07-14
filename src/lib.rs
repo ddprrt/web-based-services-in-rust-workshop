@@ -17,16 +17,27 @@ use axum::{
 use hyper::{Body, Request, StatusCode};
 use serde::Deserialize;
 use tower::{timeout::TimeoutLayer, Layer, Service, ServiceBuilder};
-use tower_http::auth::RequireAuthorizationLayer;
+use tower_http::{auth::RequireAuthorizationLayer, trace::TraceLayer};
+use tracing::{event, span, Instrument, Level, Span};
+use tracing_subscriber::prelude::*;
 
 /// Custom type for a shared state
 pub type SharedState = Arc<RwLock<AppState>>;
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct AppState {
     db: HashMap<String, Bytes>,
 }
 
 pub fn router(state: &SharedState) -> Router<SharedState> {
+    tracing_subscriber::registry()
+        .with(tracing_subscriber::EnvFilter::new(
+            std::env::var("RUST_LOG").unwrap_or_else(|_| "webservice_rust_workshop=debug".into()),
+        ))
+        .with(tracing_subscriber::fmt::layer())
+        .init();
+
+    tracing::debug!("starting router");
+
     Router::with_state(Arc::clone(state))
         .route("/", get(hello_axum))
         .route("/hello", get(handler_hello))
@@ -44,7 +55,17 @@ pub fn router(state: &SharedState) -> Router<SharedState> {
                 .layer(HandleErrorLayer::new(handle_error))
                 .layer(TimeoutLayer::new(Duration::from_secs(5))),
         )
-        .layer(LoggerMiddleware::new())
+        .layer(
+            TraceLayer::new_for_http().make_span_with(|request: &Request<_>| {
+                let method = request.method();
+                span!(
+                    Level::INFO,
+                    "kv_route_spans",
+                    method = %method,
+                    path = %request.uri().path(),
+                )
+            }),
+        )
 }
 
 fn admin_routes(state: &SharedState) -> Router<SharedState> {
@@ -52,6 +73,16 @@ fn admin_routes(state: &SharedState) -> Router<SharedState> {
         .route("/kv", delete(admin_handle_delete))
         .route("/kv/:key", delete(admin_handle_delete_key))
         .layer(RequireAuthorizationLayer::bearer("secret"))
+        .layer(
+            TraceLayer::new_for_http().make_span_with(|request: &Request<_>| {
+                span!(
+                    Level::INFO,
+                    "admin_route_spans",
+                    method = %request.method(),
+                    path = %request.uri().path(),
+                )
+            }),
+        )
 }
 
 async fn admin_handle_delete_key(
@@ -90,23 +121,28 @@ async fn handle_error(err: BoxError) -> (StatusCode, &'static str) {
     (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error")
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 struct VisitorParams {
     name: Option<String>,
 }
 
+#[tracing::instrument]
 async fn handler_hello(Query(visitor_params): Query<VisitorParams>) -> Html<String> {
+    event!(Level::INFO, "Hello Visitor");
     Html(format!(
         "<h1>Hello {}</h1>",
         visitor_params.name.unwrap_or("Unknown Visitor".to_owned())
     ))
 }
 
+#[tracing::instrument]
 async fn hello_axum() -> &'static str {
-    //tokio::time::sleep(Duration::from_secs(6)).await;
+    tokio::time::sleep(Duration::from_secs(6)).await;
+
     "<h1>Hello Axum</h1>"
 }
 
+#[tracing::instrument]
 async fn handler_kv_post(
     Path(key): Path<String>,
     State(state): State<SharedState>,
@@ -159,6 +195,7 @@ fn _foo() {
     let _str_point = Point::new("a", "b");
 }
 
+#[tracing::instrument]
 async fn handler_kv_get(
     Path(key): Path<String>,
     State(state): State<SharedState>,
